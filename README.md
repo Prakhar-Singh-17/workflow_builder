@@ -50,6 +50,65 @@ Run the backend's unit tests (pure logic + a mocked LLM — no API key needed):
 cd backend && npm test
 ```
 
+## Architecture: components and layers
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend — React + Vite"]
+        App["App.jsx<br/>(sessionId, collected, workflow)"]
+        Chat["ChatPanel.jsx"]
+        Table["StateTable.jsx"]
+        Flow["WorkflowView.jsx"]
+        Api["api.js"]
+        App --> Chat
+        App --> Table
+        App --> Flow
+        Chat --> Api
+    end
+
+    Api -- "POST /api/chat, /api/session" --> Router
+
+    subgraph Backend["Backend — Express"]
+        Router["routes/chat.js<br/>turn-loop orchestrator only,<br/>no business logic itself"]
+
+        subgraph LanguageLayer["Language layer — calls Gemini"]
+            PlanGen["planGenerator.js"]
+            Extractor["extractor.js"]
+            QWriter["questionWriter.js"]
+            LLM["llm.js<br/>callJSON(): retry once + timeout"]
+            PlanGen --> LLM
+            Extractor --> LLM
+            QWriter --> LLM
+        end
+
+        subgraph DecisionLayer["Decision layer — pure, never calls the LLM"]
+            Planner["planner.js"]
+            StateMgr["stateManager.js<br/>(evidence check)"]
+            Builder["builder.js"]
+        end
+
+        BaseSchema["config/baseSchema.js"]
+        Sessions["store/sessions.js<br/>in-memory Map"]
+
+        Router --> PlanGen
+        Router --> Extractor
+        Router --> QWriter
+        Router --> Planner
+        Router --> StateMgr
+        Router --> Builder
+        Router --> Sessions
+        StateMgr --> BaseSchema
+    end
+
+    LLM -- HTTPS --> Gemini[("Google Gemini API")]
+```
+
+Everything in the **decision layer** is plain, deterministic JavaScript with
+zero LLM calls — that's what `backend/tests/` unit-tests directly, no API key
+needed. The **language layer** is the only part that ever talks to Gemini,
+and only for proposing/extracting/phrasing — never for deciding whether the
+conversation is done.
+
 ## Architecture: the turn loop
 
 Every incoming chat message goes through the same loop, orchestrated by
