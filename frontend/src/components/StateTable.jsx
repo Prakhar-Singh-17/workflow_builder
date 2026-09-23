@@ -1,7 +1,7 @@
 const STATUS_STYLES = {
   filled: "bg-green-100 text-green-700",
   missing: "bg-amber-100 text-amber-700",
-  skipped: "bg-slate-100 text-slate-500",
+  skipped: "bg-stone-100 text-stone-500",
 };
 
 const STATUS_LABELS = {
@@ -28,20 +28,20 @@ function StateTable({ collected }) {
   const isComplete = !isEmpty && collected.every((row) => row.status !== "missing");
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h2 className="font-semibold text-slate-800">Collected Information</h2>
+    <div className="rounded-lg border border-stone-200 bg-white">
+      <div className="border-b border-stone-200 px-4 py-3">
+        <h2 className="font-semibold text-stone-800">Collected Information</h2>
       </div>
 
       {isEmpty ? (
-        <p className="p-4 text-sm text-slate-400">
+        <p className="p-4 text-sm text-stone-400">
           Nothing collected yet — start describing your automation in the chat.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-slate-500">
+              <tr className="border-b border-stone-100 text-left text-stone-500">
                 <th className="px-4 py-2 font-medium">Parameter</th>
                 <th className="px-4 py-2 font-medium">Value</th>
                 <th className="px-4 py-2 font-medium">Status</th>
@@ -49,11 +49,11 @@ function StateTable({ collected }) {
             </thead>
             <tbody>
               {collected.map((row) => (
-                <tr key={row.label} className="border-b border-slate-50 last:border-0">
-                  <td className="px-4 py-2 text-slate-700">{row.label}</td>
-                  <td className="px-4 py-2 text-slate-800">
+                <tr key={row.label} className="border-b border-stone-50 last:border-0">
+                  <td className="px-4 py-2 text-stone-700">{row.label}</td>
+                  <td className="px-4 py-2 text-stone-800">
                     {row.value === null || row.value === undefined || row.value === "" ? (
-                      <span className="text-slate-300">—</span>
+                      <span className="text-stone-300">—</span>
                     ) : (
                       String(row.value)
                     )}
@@ -69,7 +69,7 @@ function StateTable({ collected }) {
       )}
 
       {isComplete && (
-        <p className="border-t border-slate-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+        <p className="border-t border-stone-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
           All information collected ✅
         </p>
       )}

@@ -26,8 +26,8 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      <div className="flex w-full max-w-md flex-col border-r border-slate-200 bg-white">
+    <div className="flex h-screen bg-stone-50">
+      <div className="flex w-full max-w-md flex-col border-r border-stone-200 bg-white">
         <ChatPanel
           sessionId={sessionId}
           onUpdate={handleUpdate}
