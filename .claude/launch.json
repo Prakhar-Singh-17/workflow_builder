@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "client",
+      "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "client"],
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
       "port": 5173
     }
   ]
