@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import ChatPanel from "./components/ChatPanel";
+import StateTable from "./components/StateTable";
+import WorkflowView from "./components/WorkflowView";
 import { createSession } from "./api";
 
 function App() {
   const [sessionId, setSessionId] = useState(null);
-  const [phase, setPhase] = useState("awaiting_goal");
   const [collected, setCollected] = useState([]);
   const [workflow, setWorkflow] = useState(null);
 
@@ -13,15 +14,13 @@ function App() {
     createSession().then((data) => setSessionId(data.sessionId));
   }, []);
 
-  function handleUpdate({ phase, collected, workflow }) {
-    setPhase(phase);
+  function handleUpdate({ collected, workflow }) {
     setCollected(collected);
     setWorkflow(workflow);
   }
 
   function handleNewConversation(newSessionId) {
     setSessionId(newSessionId);
-    setPhase("awaiting_goal");
     setCollected([]);
     setWorkflow(null);
   }
@@ -36,12 +35,9 @@ function App() {
         />
       </div>
 
-      {/* StateTable + WorkflowView land here in Phase 7. */}
-      <div className="flex-1 p-6">
-        <p className="text-sm text-slate-400">
-          Collected information and workflow view are coming in Phase 7. (phase: {phase}, fields
-          collected: {collected.length}, workflow ready: {workflow ? "yes" : "no"})
-        </p>
+      <div className="min-w-0 flex-1 space-y-6 overflow-y-auto p-6">
+        <StateTable collected={collected} />
+        <WorkflowView workflow={workflow} />
       </div>
     </div>
   );
