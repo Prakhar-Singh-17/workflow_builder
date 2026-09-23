@@ -1,19 +1,8 @@
 import { Router } from "express";
 import { createSession, getSession, resetSession } from "../store/sessions.js";
+import { getCollectedSummary } from "../services/planner.js";
 
 const router = Router();
-
-// Turns a session's fields into the flat list the frontend's
-// "Collected Information" table displays. Real logic (skipping fields
-// that aren't required yet, etc.) lands in Phase 2's planner.js — for now
-// there are no fields to collect yet, so this is always empty.
-function getCollectedSummary(session) {
-  return Object.values(session.fields).map((field) => ({
-    label: field.label,
-    value: field.value,
-    status: field.status,
-  }));
-}
 
 // POST /api/session — start a new conversation.
 router.post("/session", (req, res) => {
