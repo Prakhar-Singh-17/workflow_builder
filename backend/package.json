@@ -1,5 +1,5 @@
 {
-  "name": "workflow-builder-server",
+  "name": "workflow-builder-backend",
   "version": "1.0.0",
   "description": "Backend for the conversational workflow builder",
   "type": "module",

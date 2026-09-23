@@ -28,13 +28,33 @@ function stripCodeFences(text) {
   return fenced ? fenced[1] : trimmed;
 }
 
+// A request that never resolves (rather than erroring) would otherwise hang
+// a turn forever — callJSON's retry only runs after a completed failure, not
+// after a stall. Real calls have taken up to ~55s during testing (a lighter
+// model under load), so this needs real margin above that, not just a guess.
+const REQUEST_TIMEOUT_MS = 90000;
+
+function withTimeout(promise, ms, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  // Clear the timer either way — otherwise a successful call still leaves a
+  // dangling timeout pending for the rest of its duration.
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
 async function requestJSON(promptName, prompt) {
   const start = Date.now();
-  const response = await getClient().models.generateContent({
-    model: process.env.GEMINI_MODEL,
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
-  });
+  const response = await withTimeout(
+    getClient().models.generateContent({
+      model: process.env.GEMINI_MODEL,
+      contents: prompt,
+      config: { responseMimeType: "application/json" },
+    }),
+    REQUEST_TIMEOUT_MS,
+    promptName
+  );
   const latencyMs = Date.now() - start;
   console.log(`[llm] ${promptName} (${latencyMs}ms)`);
   return JSON.parse(stripCodeFences(response.text ?? ""));
