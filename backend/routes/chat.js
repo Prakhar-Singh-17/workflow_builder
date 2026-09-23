@@ -4,8 +4,16 @@ import { getCollectedSummary, getNextMissingField } from "../services/planner.js
 import { applyBaseSchema, mergeUpdates } from "../services/stateManager.js";
 import { generatePlan } from "../services/planGenerator.js";
 import { extract } from "../services/extractor.js";
+import { writeQuestion } from "../services/questionWriter.js";
+import { buildWorkflow } from "../services/builder.js";
 
 const router = Router();
+
+// A simple, deterministic check for "the user said yes" — kept in code
+// rather than left to the LLM, since confirming/not-confirming is exactly
+// the kind of binary decision the planner (not the extractor) should make.
+const AFFIRMATIVE_PATTERN =
+  /\b(yes|yep|yeah|yup|correct|confirm(ed)?|looks good|sounds good|go ahead|build it|that'?s right|proceed|do it|perfect|great)\b/i;
 
 // POST /api/session — start a new conversation.
 router.post("/session", (req, res) => {
@@ -31,16 +39,13 @@ router.post("/session/:id/reset", (req, res) => {
   res.json({ sessionId: session.id, phase: session.phase });
 });
 
-// Figures out the reply once we know the session's fields are up to date:
-// ask about the pending ambiguity if there is one, otherwise ask about the
-// next missing field, otherwise move to "confirming" and summarize.
-// This mutates session.fields/lastAskedFieldId/phase — safe to do here
-// because by the time this runs, every LLM call for the turn has already
-// succeeded (see handleAwaitingGoal/handleCollecting below).
-//
-// Phase 5 replaces the plain field.question with an LLM-phrased one
-// (questionWriter) and adds real handling for "confirming"/"done".
-function decideNextStep(session) {
+// Figures out the reply once the session's fields are up to date: ask about
+// the pending ambiguity if there is one, otherwise ask about the next
+// missing field (phrased naturally by questionWriter), otherwise move to
+// "confirming" and summarize. This mutates session.fields/lastAskedFieldId/
+// phase — safe to do here because by the time this runs, every LLM call for
+// the turn has already succeeded (see the handle* functions below).
+async function decideNextStep(session) {
   if (session.pendingAmbiguity) {
     return session.pendingAmbiguity.question;
   }
@@ -50,7 +55,13 @@ function decideNextStep(session) {
 
   if (fieldId) {
     session.lastAskedFieldId = fieldId;
-    return session.fields[fieldId].question;
+    const recentMessages = session.messages.slice(-6);
+    const collectedValues = Object.fromEntries(
+      getCollectedSummary(session)
+        .filter((row) => row.status === "filled")
+        .map((row) => [row.label, row.value])
+    );
+    return writeQuestion(session.fields[fieldId], recentMessages, collectedValues);
   }
 
   session.phase = "confirming";
@@ -58,7 +69,7 @@ function decideNextStep(session) {
     .filter((row) => row.status === "filled")
     .map((row) => `- ${row.label}: ${row.value}`)
     .join("\n");
-  return `Here's what I've got so far:\n${summaryLines}\n\nDoes this all look right? (Confirming and building the workflow is coming in the next phase.)`;
+  return `Here's what I've got so far:\n${summaryLines}\n\nDoes this all look right? Say "yes" to build it, or tell me what to change.`;
 }
 
 // Merges a freshly (re)generated plan into the session without ever
@@ -74,6 +85,13 @@ function mergePlanIntoSession(session, state) {
   session.components = state.components;
   session.fieldOrder = state.fieldOrder;
   session.fields = fields;
+}
+
+// How many of the extractor's proposed updates actually passed the evidence
+// check and got applied — used to tell "the user changed something" apart
+// from "nothing about this message updated the checklist".
+function countAcceptedUpdates(extraction, rejectedUpdates) {
+  return Object.keys(extraction.updates || {}).length - rejectedUpdates.length;
 }
 
 // First message of the conversation: generate the checklist, then extract
@@ -147,6 +165,74 @@ async function handleCollecting(session, message) {
   return decideNextStep(session);
 }
 
+// The user has been shown the collected summary and is expected to either
+// confirm it, correct something, or both in the same message
+// ("yes, but use Outlook instead"). A correction always wins: it re-opens
+// collection so planner.getNextMissingField can re-check whether anything
+// is now missing (e.g. a corrected boolean unlocking a conditional field)
+// before we're willing to build anything.
+async function handleConfirming(session, message) {
+  const extraction = await extract(session, null, message);
+  const { fields, rejectedUpdates } = mergeUpdates(session, extraction.updates, message);
+  const acceptedUpdateCount = countAcceptedUpdates(extraction, rejectedUpdates);
+  const newAmbiguity = extraction.ambiguities[0] || null;
+
+  // Everything succeeded — commit.
+  session.fields = fields;
+  session.rejectedUpdates.push(...rejectedUpdates);
+
+  // A correction, or even just a vague attempt at one ("actually notify the
+  // team instead"), re-opens collection so it gets resolved properly rather
+  // than silently dropped while we wait for a plain "yes".
+  if (acceptedUpdateCount > 0 || newAmbiguity) {
+    session.pendingAmbiguity = newAmbiguity;
+    session.phase = "collecting";
+    return decideNextStep(session);
+  }
+
+  if (AFFIRMATIVE_PATTERN.test(message) && !extraction.offTopic) {
+    session.workflow = buildWorkflow(session);
+    session.phase = "done";
+    return "Your workflow is ready — see the diagram and JSON on the right. Ask for any changes, or start a new one.";
+  }
+
+  // Neither a correction nor a clear "yes" — re-show the summary rather
+  // than guessing what the user meant.
+  return decideNextStep(session);
+}
+
+// The workflow has already been built. A further message either asks for a
+// change (re-opens collection, and the workflow is rebuilt once
+// re-confirmed) or is just conversation, which gets a plain reply.
+async function handleDone(session, message) {
+  const extraction = await extract(session, null, message);
+  const { fields, rejectedUpdates } = mergeUpdates(session, extraction.updates, message);
+  const acceptedUpdateCount = countAcceptedUpdates(extraction, rejectedUpdates);
+  const newAmbiguity = extraction.ambiguities[0] || null;
+
+  let expandedState = null;
+  if (extraction.introducesNewScope) {
+    const expandedPlan = await generatePlan(message, session);
+    expandedState = applyBaseSchema(expandedPlan);
+  }
+
+  if (acceptedUpdateCount === 0 && !expandedState && !newAmbiguity) {
+    // Still log any rejected (hallucinated) updates even though nothing
+    // about the workflow itself is changing this turn.
+    session.rejectedUpdates.push(...rejectedUpdates);
+    return 'Let me know what you\'d like to change, or start a "New conversation" to build a different workflow.';
+  }
+
+  session.fields = fields;
+  session.rejectedUpdates.push(...rejectedUpdates);
+  session.pendingAmbiguity = newAmbiguity;
+  if (expandedState) mergePlanIntoSession(session, expandedState);
+  session.workflow = null; // stale until the user re-confirms
+  session.phase = "collecting";
+
+  return decideNextStep(session);
+}
+
 // POST /api/chat — the main turn loop.
 router.post("/chat", async (req, res) => {
   const { sessionId, message } = req.body;
@@ -168,9 +254,10 @@ router.post("/chat", async (req, res) => {
       reply = await handleAwaitingGoal(session, message);
     } else if (session.phase === "collecting") {
       reply = await handleCollecting(session, message);
+    } else if (session.phase === "confirming") {
+      reply = await handleConfirming(session, message);
     } else {
-      // "confirming" / "done" — real handling lands in Phase 5.
-      reply = "Got it — confirming and generating the workflow is coming in the next phase.";
+      reply = await handleDone(session, message);
     }
   } catch (err) {
     console.error(`[chat] turn failed: ${err.message}`);
