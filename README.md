@@ -23,7 +23,7 @@ asking — and it has to get all of that right without ever guessing.
 ```bash
 git clone <this repo>
 cd <repo>
-cp .env.example .env   # then fill in GEMINI_API_KEY
+cp .env.example .env   # then fill in GROQ_API_KEY
 ```
 
 The `.env` file lives at the **project root**, shared by both `backend/` and
@@ -31,8 +31,8 @@ The `.env` file lives at the **project root**, shared by both `backend/` and
 
 ```env
 PORT=3001
-GEMINI_API_KEY=your-gemini-api-key-here
-GEMINI_MODEL=gemini-3.6-flash
+GROQ_API_KEY=your-groq-api-key-here
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
 Install and run each package (two terminals):
@@ -69,10 +69,10 @@ no dev-server proxy in production to paper over that.
 - Root Directory: `backend`
 - Build Command: `npm install`
 - Start Command: `npm start`
-- Environment variables: `GEMINI_API_KEY` (your key — enter it directly in
-  Render's dashboard, never commit it) and `GEMINI_MODEL` (e.g.
-  `gemini-3.6-flash`). `PORT` doesn't need setting — Render injects its own
-  and `backend/index.js` already reads `process.env.PORT`.
+- Environment variables: `GROQ_API_KEY` (your key — enter it directly in
+  Render's dashboard, never commit it) and `GROQ_MODEL` (e.g.
+  `llama-3.3-70b-versatile`). `PORT` doesn't need setting — Render injects
+  its own and `backend/index.js` already reads `process.env.PORT`.
 - Once it's deployed, note its public URL (`https://<name>.onrender.com`).
 
 **3. Frontend — new Static Site:**
@@ -111,7 +111,7 @@ flowchart TB
     subgraph Backend["Backend — Express"]
         Router["routes/chat.js<br/>turn-loop orchestrator only,<br/>no business logic itself"]
 
-        subgraph LanguageLayer["Language layer — calls Gemini"]
+        subgraph LanguageLayer["Language layer — calls Groq"]
             PlanGen["planGenerator.js"]
             Extractor["extractor.js"]
             QWriter["questionWriter.js"]
@@ -140,12 +140,12 @@ flowchart TB
         StateMgr --> BaseSchema
     end
 
-    LLM -- HTTPS --> Gemini[("Google Gemini API")]
+    LLM -- HTTPS --> Groq[("Groq API")]
 ```
 
 Everything in the **decision layer** is plain, deterministic JavaScript with
 zero LLM calls — that's what `backend/tests/` unit-tests directly, no API key
-needed. The **language layer** is the only part that ever talks to Gemini,
+needed. The **language layer** is the only part that ever talks to Groq,
 and only for proposing/extracting/phrasing — never for deciding whether the
 conversation is done.
 
@@ -273,11 +273,20 @@ automation.
   ambiguity, only the first is tracked (matches the current data model, which
   has one `pendingAmbiguity` slot per session) — the rest would need to be
   re-raised on a later turn.
-- **Model choice matters more than it might seem.** Development used a lighter
-  model (`gemini-3.5-flash-lite`) to conserve API quota; the extractor's
-  judgment calls (vague vs. explicit, off-topic vs. relevant, new scope vs.
-  not) noticeably benefit from a stronger model like `gemini-3.6-flash` for
-  production use.
+- **Provider history.** This project used Google's Gemini API through most of
+  development, but its free tier proved unreliable for a live demo — models
+  got deprecated mid-project, and the remaining ones repeatedly returned
+  "high demand" 503s under normal use, on top of a strict 20-requests/day cap.
+  It's since switched fully to Groq, which has been reliable in practice.
+  Because every LLM call in the app is funneled through the single
+  `callJSON()` wrapper in `backend/services/llm.js`, switching providers only
+  meant rewriting that one file — no prompts, no turn-loop logic, nothing
+  else changed.
+- **Model choice still matters.** `llama-3.3-70b-versatile` is the default —
+  it's Groq's flagship model and handles the extractor's fuzzier judgment
+  calls (vague vs. explicit, off-topic vs. relevant, new scope vs. not) well.
+  `llama-3.1-8b-instant` is available as a faster/lighter alternative if
+  needed, at some cost to those same judgment calls.
 
 ## Sample conversations
 
