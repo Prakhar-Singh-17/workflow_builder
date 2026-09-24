@@ -50,6 +50,49 @@ Run the backend's unit tests (pure logic + a mocked LLM — no API key needed):
 cd backend && npm test
 ```
 
+## Deploying to Render
+
+This deploys as **two separate services** from the one repo — a Node web
+service for `backend/`, and a static site for `frontend/`'s build output.
+They end up on different `.onrender.com` domains, which is why the backend
+already has permissive CORS enabled and why the frontend needs to be told the
+backend's URL explicitly (see `VITE_API_URL` below) — unlike local dev, there's
+no dev-server proxy in production to paper over that.
+
+**1. Push this repo to GitHub** (Render deploys from a git remote).
+
+**2. Backend — new Web Service:**
+- Root Directory: `backend`
+- Build Command: `npm install`
+- Start Command: `npm start`
+- Environment variables: `GEMINI_API_KEY` (your key — enter it directly in
+  Render's dashboard, never commit it) and `GEMINI_MODEL` (e.g.
+  `gemini-3.6-flash`). `PORT` doesn't need setting — Render injects its own
+  and `backend/index.js` already reads `process.env.PORT`.
+- Once it's deployed, note its public URL (`https://<name>.onrender.com`).
+
+**3. Frontend — new Static Site:**
+- Root Directory: `frontend`
+- Build Command: `npm install && npm run build`
+- Publish Directory: `dist`
+- Environment variable: `VITE_API_URL` = the backend's URL from step 2, with
+  `/api` appended (e.g. `https://workflow-builder-backend.onrender.com/api`).
+  This has to be set *before* the build runs — Vite bakes `VITE_`-prefixed
+  vars in at build time, not runtime.
+- Add a rewrite rule so client-side routing doesn't 404 on refresh: source
+  `/*` → destination `/index.html`.
+
+A [render.yaml](render.yaml) Blueprint is included with this same
+configuration, if you'd rather use Render's one-click Blueprint deploy —
+just double-check the frontend's `VITE_API_URL` against the backend's actual
+assigned URL afterward (Render only guarantees the guessed
+`<name>.onrender.com` URL if that name isn't already taken by someone else),
+and redeploy the frontend if it needs correcting.
+
+**Note on the free tier:** Render's free web services spin down after periods
+of inactivity and take some time to spin back up on the next request — the
+first message after idling will be slow through no fault of the app itself.
+
 ## Architecture: components and layers
 
 ```mermaid
