@@ -1,5 +1,9 @@
 # Conversational Workflow Builder
 
+**Live demo: [workflow-builder-8s38.onrender.com](https://workflow-builder-8s38.onrender.com/)**
+(hosted on Render's free tier — the backend spins down when idle, so the
+first message after a while may take a bit to wake it up)
+
 A chatbot that turns a natural-language automation request (any domain — "notify
 finance when an invoice arrives", "build a CI/CD pipeline for my app") into a
 structured workflow (nodes + edges), the way n8n's planning experience works.
@@ -81,13 +85,6 @@ no dev-server proxy in production to paper over that.
   vars in at build time, not runtime.
 - Add a rewrite rule so client-side routing doesn't 404 on refresh: source
   `/*` → destination `/index.html`.
-
-A [render.yaml](render.yaml) Blueprint is included with this same
-configuration, if you'd rather use Render's one-click Blueprint deploy —
-just double-check the frontend's `VITE_API_URL` against the backend's actual
-assigned URL afterward (Render only guarantees the guessed
-`<name>.onrender.com` URL if that name isn't already taken by someone else),
-and redeploy the frontend if it needs correcting.
 
 **Note on the free tier:** Render's free web services spin down after periods
 of inactivity and take some time to spin back up on the next request — the
