@@ -27,17 +27,19 @@ function App() {
 
   return (
     <div className="flex h-screen bg-stone-50">
-      <div className="flex w-full max-w-md flex-col border-r border-stone-200 bg-white">
+      <div className="min-w-0 flex-1 overflow-y-auto border-r border-stone-200 p-6">
+        <div className="mx-auto max-w-3xl space-y-6">
+          <StateTable collected={collected} />
+          <WorkflowView workflow={workflow} />
+        </div>
+      </div>
+
+      <div className="flex w-full max-w-md flex-col bg-white shadow-[-4px_0_16px_-8px_rgba(0,0,0,0.08)]">
         <ChatPanel
           sessionId={sessionId}
           onUpdate={handleUpdate}
           onNewConversation={handleNewConversation}
         />
-      </div>
-
-      <div className="min-w-0 flex-1 space-y-6 overflow-y-auto p-6">
-        <StateTable collected={collected} />
-        <WorkflowView workflow={workflow} />
       </div>
     </div>
   );

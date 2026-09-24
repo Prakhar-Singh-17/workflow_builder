@@ -5,6 +5,13 @@ const KIND_ICON = {
   end: "🏁",
 };
 
+const KIND_BADGE_STYLES = {
+  trigger: "bg-orange-100 text-orange-700",
+  condition: "bg-amber-100 text-amber-700",
+  action: "bg-stone-100 text-stone-700",
+  end: "bg-stone-800 text-white",
+};
+
 // "triggerApp" already renders as the app badge for trigger nodes — showing
 // it again in the config list below would just be the same value twice.
 const HIDDEN_CONFIG_KEYS_BY_KIND = {
@@ -23,14 +30,20 @@ function NodeBox({ node }) {
   );
 
   return (
-    <div className="w-52 shrink-0 rounded-lg border border-stone-300 bg-white p-3 shadow-sm">
+    <div className="w-52 shrink-0 rounded-xl border border-stone-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-center gap-2">
-        <span className="text-lg">{KIND_ICON[node.kind] ?? "🔹"}</span>
-        <span className="text-sm font-semibold text-stone-800">{node.label}</span>
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm ${
+            KIND_BADGE_STYLES[node.kind] ?? "bg-stone-100 text-stone-700"
+          }`}
+        >
+          {KIND_ICON[node.kind] ?? "🔹"}
+        </span>
+        <span className="text-sm font-semibold leading-tight text-stone-800">{node.label}</span>
       </div>
 
       {node.app && (
-        <span className="mt-1.5 inline-block rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
+        <span className="mt-2 inline-block rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
           {node.app}
         </span>
       )}
@@ -79,15 +92,18 @@ function WorkflowView({ workflow }) {
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold text-stone-800">Workflow</h2>
+    <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🧩</span>
+          <h2 className="font-semibold text-stone-800">Workflow</h2>
+        </div>
         <button
           type="button"
           onClick={() => downloadWorkflow(workflow)}
-          className="text-sm font-medium text-orange-600 hover:text-orange-700"
+          className="rounded-full border border-orange-200 px-3 py-1 text-xs font-medium text-orange-600 hover:bg-orange-50"
         >
-          Download JSON
+          ⬇ Download JSON
         </button>
       </div>
 

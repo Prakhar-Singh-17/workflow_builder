@@ -28,13 +28,14 @@ function StateTable({ collected }) {
   const isComplete = !isEmpty && collected.every((row) => row.status !== "missing");
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white">
-      <div className="border-b border-stone-200 px-4 py-3">
+    <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-stone-200 px-4 py-3">
+        <span className="text-base">📋</span>
         <h2 className="font-semibold text-stone-800">Collected Information</h2>
       </div>
 
       {isEmpty ? (
-        <p className="p-4 text-sm text-stone-400">
+        <p className="p-6 text-center text-sm text-stone-400">
           Nothing collected yet — start describing your automation in the chat.
         </p>
       ) : (
@@ -49,7 +50,7 @@ function StateTable({ collected }) {
             </thead>
             <tbody>
               {collected.map((row) => (
-                <tr key={row.label} className="border-b border-stone-50 last:border-0">
+                <tr key={row.label} className="border-b border-stone-50 last:border-0 hover:bg-stone-50/60">
                   <td className="px-4 py-2 text-stone-700">{row.label}</td>
                   <td className="px-4 py-2 text-stone-800">
                     {row.value === null || row.value === undefined || row.value === "" ? (
